@@ -1,10 +1,46 @@
 import os
 import sys
+import math
 import threading
 import linecache
 import sysconfig
 from time import monotonic as _time, sleep
 from trace import _modname, _Ignore
+
+import keyboard
+from utils import clear_screen
+
+
+TICK_TIME = 1.5
+
+global orig_print
+orig_print = print
+
+
+def print_func(*args, **kargs):
+    orig_print(*args, **kargs)
+
+
+def dummy_print(*args, **kwargs):
+    pass
+
+print = dummy_print
+
+
+def increment_execution_time():
+    TICK_TIME += 1
+    print("New tick time is ", TICK_TIME, "seconds")
+    sys.exit(0)
+
+def decrement_execution_time():
+    TICK_TIME -= 1
+    print("New tick time is ", TICK_TIME, "seconds")
+    sys.exit(0)
+
+
+keyboard.add_hotkey('ctrl+shift+plus', increment_execution_time)
+keyboard.add_hotkey('ctrl+shift+-', decrement_execution_time)
+# keyboard.wait()
 
 
 def get_ignore_object(ignore_module, ignore_dir):
@@ -57,29 +93,33 @@ def localtrace_trace(frame, event, arg):
         lineno = frame.f_lineno
         lvars = frame.f_locals
 
-        # if start_time:
-        #     print('%.2f' % (_time() - localtrace_trace.start_time), end=' ')
+        if filename == __file__:
+            return localtrace_trace
 
-        # bname = os.path.basename(filename)
-        # print("\033[43m%s:%d %s \033[0m" % (filename.strip(), lineno,
-        #                         linecache.getline(filename, lineno)), end='')
         print_code(filename, lineno)
+
     return localtrace_trace
 
 
 def print_code(filename, lineno):
-    os.system("clear")
+    clear_screen()
+    terminal_size = os.get_terminal_size()
+    lines, columns = terminal_size.lines, terminal_size.columns
     bname = os.path.basename(filename)
     current_line = linecache.getline(filename, lineno)
-    if 'print' in current_line:
-        return
+    display_name = "{0} {1}".format("*" * math.floor((columns - len(bname)) / 2), bname)
+    display_name = "{0} {1}".format(display_name, "*" * (columns - len(display_name) - 1))
+
+    orig_print("*" * columns)
+    orig_print(display_name)
+    orig_print("*" * columns, "\n")
     
     for idx,line in enumerate(linecache.getlines(filename)):
         if idx+1 == lineno:
-            print("\033[43m%s:%d %s \033[0m" % (bname.strip(), idx + 1, line), end='')
+            orig_print("\033[43m%s:%d\t%s\033[0m" % (bname.strip(), idx + 1, line), end='')
         else:
-            print("%s:%d %s \033[0m" % (bname.strip(), idx + 1, line), end='')
-    sleep(1.5)
+            orig_print("%s:%d\t%s\033[0m" % (bname.strip(), idx + 1, line), end='')
+    sleep(TICK_TIME)
 
 
 def main():
@@ -97,6 +137,7 @@ def main():
             '__name__': '__main__',
             '__package__': None,
             '__cached__': None,
+            'print': dummy_print,
         }
         threading.settrace(global_trace)
         sys.settrace(global_trace)
