@@ -13,7 +13,7 @@ from colors import Color
 from utils import clear_screen
 
 
-TICK_TIME = 1.5
+TICK_TIME = 1.8
 
 global orig_print, output_stream
 orig_print, output_stream = print, TemporaryFile(mode="w+")
@@ -34,12 +34,14 @@ def decrement_execution_time():
     sys.exit(0)
 
 
-keyboard.add_hotkey('ctrl+shift+plus', increment_execution_time)
-keyboard.add_hotkey('ctrl+shift+-', decrement_execution_time)
+keyboard.add_hotkey('ctrl + shift + plus', increment_execution_time)
+keyboard.add_hotkey('ctrl + shift + -', decrement_execution_time)
 # keyboard.wait()
 
 
 def get_ignore_object(ignore_module, ignore_dir):
+    """Returns an Ignore object for ignoring the provided modules and directories"""
+
     _prefix = sysconfig.get_path("stdlib")
     _exec_prefix = sysconfig.get_path("platstdlib")
     _data = sysconfig.get_path("data")
@@ -62,7 +64,6 @@ def global_trace(frame, event, arg):
     else returns self.localtrace.
     """
     trace = True
-    # print(event, arg, frame)
     ignore = get_ignore_object([], [])
     if event == 'call':
         code = frame.f_code
@@ -74,9 +75,6 @@ def global_trace(frame, event, arg):
             if modulename is not None:
                 ignore_it = ignore.names(filename, modulename)
                 if not ignore_it:
-                    if trace:
-                        # print((" --- modulename: %s, funcname: %s" % (modulename, code.co_name)))
-                        pass
                     return localtrace_trace
         else:
             return None
@@ -102,19 +100,33 @@ def print_code(filename, lineno):
     terminal_size = os.get_terminal_size()
     lines, columns = terminal_size.lines, terminal_size.columns
     bname = os.path.basename(filename)
-    current_line = linecache.getline(filename, lineno)
-    display_name = "{0} {1}".format("*" * math.floor((columns - len(bname)) / 2), bname)
-    display_name = "{0} {1}".format(display_name, "*" * (columns - len(display_name) - 1))
+    display_name = "{0} {1}".format(">" * math.floor((columns - len(bname)) / 2), bname)
+    display_name = "{0} {1}".format(display_name, "<" * (columns - len(display_name) - 1))
 
-    orig_print("*" * columns)
-    orig_print(display_name)
-    orig_print("*" * columns, "\n")
+    # Reducing the available number of lines by 1 so that new line character of the last line 
+    # doesn't impact the view
+    remaining_lines = lines - 1    
+    # orig_print(f"{'-' * columns}" % ())
+    orig_print(f"{Color.FG.lightgreen}{Color.bold}{display_name}")
+    # orig_print("-" * columns)
+    orig_print(f"{Color.reset}")
+    remaining_lines -= 2
     
-    for idx,line in enumerate(linecache.getlines(filename)):
-        if idx+1 == lineno:
-            orig_print("%s%s:%d\t%s%s" % (Color.BG.orange, bname.strip(), idx + 1, line, Color.reset), end='')
+    code_lines = linecache.getlines(filename)
+    if lineno < remaining_lines:
+        start, end = 0, remaining_lines
+    elif lineno + remaining_lines > len(code_lines):
+        start, end = len(code_lines) - remaining_lines, len(code_lines)
+    else:
+        start, end = lineno - math.floor(remaining_lines / 2), lineno + math.floor(remaining_lines / 2)
+        
+    for idx,line in enumerate(code_lines[start:end]):
+        current_line_num = start + idx + 1 
+        if current_line_num == lineno:
+            orig_print("%s%s:%d\t%s%s" % (Color.BG.orange, bname.strip(), current_line_num, line, Color.reset), end='')
         else:
-            orig_print("%s:%d\t%s%s" % (bname.strip(), idx + 1, line, Color.reset), end='')
+            orig_print("%s:%d\t%s%s" % (bname.strip(), current_line_num, line, Color.reset), end='') 
+
     sleep(TICK_TIME)
 
 
