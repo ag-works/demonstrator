@@ -8,6 +8,7 @@ from time import monotonic as _time, sleep
 from trace import _modname, _Ignore
 
 import keyboard
+from colors import Color
 from utils import clear_screen
 
 
@@ -116,9 +117,9 @@ def print_code(filename, lineno):
     
     for idx,line in enumerate(linecache.getlines(filename)):
         if idx+1 == lineno:
-            orig_print("\033[43m%s:%d\t%s\033[0m" % (bname.strip(), idx + 1, line), end='')
+            orig_print("%s%s:%d\t%s%s" % (Color.BG.orange, bname.strip(), idx + 1, line, Color.reset), end='')
         else:
-            orig_print("%s:%d\t%s\033[0m" % (bname.strip(), idx + 1, line), end='')
+            orig_print("%s:%d\t%s%s" % (bname.strip(), idx + 1, line, Color.reset), end='')
     sleep(TICK_TIME)
 
 
