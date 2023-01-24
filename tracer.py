@@ -4,6 +4,7 @@ import math
 import threading
 import linecache
 import sysconfig
+from tempfile import TemporaryFile
 from time import monotonic as _time, sleep
 from trace import _modname, _Ignore
 
@@ -14,17 +15,11 @@ from utils import clear_screen
 
 TICK_TIME = 1.5
 
-global orig_print
-orig_print = print
+global orig_print, output_stream
+orig_print, output_stream = print, TemporaryFile(mode="w+")
 
-
-def print_func(*args, **kargs):
-    orig_print(*args, **kargs)
-
-
-def dummy_print(*args, **kwargs):
-    pass
-
+def print_func(*args, **kargs): orig_print(*args, **kargs)
+def dummy_print(*args, **kwargs): orig_print(*args, file=output_stream, **kwargs)
 print = dummy_print
 
 
@@ -123,6 +118,16 @@ def print_code(filename, lineno):
     sleep(TICK_TIME)
 
 
+def display_and_release_output():
+    # This prints the actual `stdout` output from the provided program and releases 
+    # `output_stream` resource for garbage collection
+    global output_stream
+    clear_screen()
+    output_stream.seek(0)
+    orig_print(output_stream.read())
+    del output_stream
+
+
 def main():
     try:
         arguments = sys.argv
@@ -147,6 +152,8 @@ def main():
         finally:
             sys.settrace(None)
             threading.settrace(None)
+
+        display_and_release_output()
     except OSError as err:
         sys.exit("Cannot run file %r because: %s" % (sys.argv[0], err))
     except SystemExit:
