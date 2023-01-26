@@ -10,10 +10,11 @@ from trace import _modname, _Ignore
 
 import keyboard
 from colors import Color
-from utils import clear_screen
+from utils import clear_screen, MOVE_CURSOR_UP
 
 
 TICK_TIME = 1.8
+EXECUTION_PAUSED = False
 
 global orig_print, output_stream
 orig_print, output_stream = print, TemporaryFile(mode="w+")
@@ -24,19 +25,25 @@ print = dummy_print
 
 
 def increment_execution_time():
+    global TICK_TIME
     TICK_TIME += 1
-    print("New tick time is ", TICK_TIME, "seconds")
-    sys.exit(0)
+
 
 def decrement_execution_time():
+    global TICK_TIME
     TICK_TIME -= 1
-    print("New tick time is ", TICK_TIME, "seconds")
-    sys.exit(0)
 
 
-keyboard.add_hotkey('ctrl + shift + plus', increment_execution_time)
-keyboard.add_hotkey('ctrl + shift + -', decrement_execution_time)
-# keyboard.wait()
+def toggle_execution_mode():
+    global EXECUTION_PAUSED
+    EXECUTION_PAUSED = not EXECUTION_PAUSED
+    terminal_size = os.get_terminal_size()
+    orig_print(MOVE_CURSOR_UP * terminal_size.lines, "Paused" if EXECUTION_PAUSED else "Running")
+
+
+keyboard.add_hotkey('ctrl+shift+plus', increment_execution_time, suppress=True)
+keyboard.add_hotkey('ctrl+shift+-', decrement_execution_time, suppress=True)
+keyboard.add_hotkey('space', toggle_execution_mode, suppress=True)
 
 
 def get_ignore_object(ignore_module, ignore_dir):
@@ -103,6 +110,9 @@ def localtrace_trace(frame, event, arg):
 
 
 def print_code(filename, lineno):
+    while EXECUTION_PAUSED is True:
+        sleep(TICK_TIME)
+
     clear_screen()
     terminal_size = os.get_terminal_size()
     lines, columns = terminal_size.lines, terminal_size.columns
