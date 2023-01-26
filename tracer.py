@@ -75,6 +75,13 @@ def global_trace(frame, event, arg):
             if modulename is not None:
                 ignore_it = ignore.names(filename, modulename)
                 if not ignore_it:
+                    terminal_size = os.get_terminal_size()
+                    lines, columns = terminal_size.lines, terminal_size.columns
+                    clear_screen()
+                    orig_print("\n" * math.floor(lines / 2))
+                    message = "Getting inside %s" % filename.replace(os.getcwd(), "").lstrip(os.path.sep)
+                    orig_print(" " * math.floor((columns - len(message)) / 2), message)
+                    sleep(TICK_TIME)
                     return localtrace_trace
         else:
             return None
