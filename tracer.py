@@ -10,7 +10,7 @@ from trace import _modname, _Ignore
 
 import keyboard
 from colors import Color
-from utils import clear_screen, MOVE_CURSOR_UP
+from utils import clear_screen, get_terminal_size, MOVE_CURSOR_UP
 
 
 TICK_TIME = 1.8
@@ -38,8 +38,8 @@ def decrement_execution_time():
 def toggle_execution_mode():
     global EXECUTION_PAUSED
     EXECUTION_PAUSED = not EXECUTION_PAUSED
-    terminal_size = os.get_terminal_size()
-    orig_print(MOVE_CURSOR_UP * terminal_size.lines, "Paused" if EXECUTION_PAUSED else "Running")
+    lines, _ = get_terminal_size()
+    orig_print(MOVE_CURSOR_UP * lines, "Paused" if EXECUTION_PAUSED else "Running")
 
 
 keyboard.add_hotkey('ctrl+shift+plus', increment_execution_time, suppress=True)
@@ -71,6 +71,9 @@ def global_trace(frame, event, arg):
     If the code block being entered is to be ignored, returns `None',
     else returns self.localtrace.
     """
+    while EXECUTION_PAUSED is True:
+        sleep(TICK_TIME)
+
     global displayed_module
     ignore = get_ignore_object([], [])
     if event == 'call':
@@ -84,9 +87,8 @@ def global_trace(frame, event, arg):
                 if ignore_it:
                     return
 
-                terminal_size = os.get_terminal_size()
-                lines, columns = terminal_size.lines, terminal_size.columns
                 clear_screen()
+                lines, columns = get_terminal_size()
                 orig_print("\n" * math.floor(lines / 2))
                 message = "Getting inside %s" % relative_filepath
                 displayed_module = relative_filepath
@@ -117,9 +119,7 @@ def print_code(filename, lineno):
         sleep(TICK_TIME)
 
     clear_screen()
-    terminal_size = os.get_terminal_size()
-    lines, columns = terminal_size.lines, terminal_size.columns
-    bname = os.path.basename(filename)
+    lines, columns = get_terminal_size()
     display_name = "{0} {1}".format(">" * math.floor((columns - len(displayed_module)) / 2), displayed_module)
     display_name = "{0} {1}".format(display_name, "<" * (columns - len(display_name) - 1))
 
