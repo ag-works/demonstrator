@@ -16,8 +16,9 @@ from utils import clear_screen, MOVE_CURSOR_UP
 TICK_TIME = 1.8
 EXECUTION_PAUSED = False
 
-global orig_print, output_stream
+global orig_print, output_stream, displayed_module
 orig_print, output_stream = print, TemporaryFile(mode="w+")
+displayed_module = None
 
 def print_func(*args, **kargs): orig_print(*args, **kargs)
 def dummy_print(*args, **kwargs): orig_print(*args, file=output_stream, **kwargs)
@@ -70,26 +71,28 @@ def global_trace(frame, event, arg):
     If the code block being entered is to be ignored, returns `None',
     else returns self.localtrace.
     """
-    trace = True
+    global displayed_module
     ignore = get_ignore_object([], [])
     if event == 'call':
         code = frame.f_code
         filename = frame.f_globals.get('__file__', None)
         if filename:
-            # XXX _modname() doesn't work right for packages, so
-            # the ignore support won't work right for packages
             modulename = _modname(filename)
-            if modulename is not None:
+            relative_filepath = filename.replace(os.getcwd(), "").lstrip(os.path.sep)
+            if modulename is not None and relative_filepath != displayed_module:
                 ignore_it = ignore.names(filename, modulename)
-                if not ignore_it:
-                    terminal_size = os.get_terminal_size()
-                    lines, columns = terminal_size.lines, terminal_size.columns
-                    clear_screen()
-                    orig_print("\n" * math.floor(lines / 2))
-                    message = "Getting inside %s" % filename.replace(os.getcwd(), "").lstrip(os.path.sep)
-                    orig_print(" " * math.floor((columns - len(message)) / 2), message)
-                    sleep(TICK_TIME)
-                    return localtrace_trace
+                if ignore_it:
+                    return
+
+                terminal_size = os.get_terminal_size()
+                lines, columns = terminal_size.lines, terminal_size.columns
+                clear_screen()
+                orig_print("\n" * math.floor(lines / 2))
+                message = "Getting inside %s" % relative_filepath
+                displayed_module = relative_filepath
+                orig_print(" " * math.floor((columns - len(message)) / 2), message)
+                sleep(TICK_TIME)
+                return localtrace_trace
         else:
             return None
 
@@ -117,15 +120,13 @@ def print_code(filename, lineno):
     terminal_size = os.get_terminal_size()
     lines, columns = terminal_size.lines, terminal_size.columns
     bname = os.path.basename(filename)
-    display_name = "{0} {1}".format(">" * math.floor((columns - len(bname)) / 2), bname)
+    display_name = "{0} {1}".format(">" * math.floor((columns - len(displayed_module)) / 2), displayed_module)
     display_name = "{0} {1}".format(display_name, "<" * (columns - len(display_name) - 1))
 
     # Reducing the available number of lines by 1 so that new line character of the last line 
     # doesn't impact the view
     remaining_lines = lines - 1    
-    # orig_print(f"{'-' * columns}" % ())
     orig_print(f"{Color.FG.lightgreen}{Color.bold}{display_name}")
-    # orig_print("-" * columns)
     orig_print(f"{Color.reset}")
     remaining_lines -= 2
     
@@ -140,9 +141,9 @@ def print_code(filename, lineno):
     for idx,line in enumerate(code_lines[start:end]):
         current_line_num = start + idx + 1 
         if current_line_num == lineno:
-            orig_print("%s%s:%d\t%s%s" % (Color.BG.orange, bname.strip(), current_line_num, line, Color.reset), end='')
+            orig_print("%s%d\t%s%s" % (Color.BG.orange, current_line_num, line, Color.reset), end='')
         else:
-            orig_print("%s:%d\t%s%s" % (bname.strip(), current_line_num, line, Color.reset), end='') 
+            orig_print("%d\t%s%s" % (current_line_num, line, Color.reset), end='') 
 
     sleep(TICK_TIME)
 
