@@ -78,7 +78,6 @@ def global_trace(frame, event, arg):
         sleep(TICK_TIME)
 
     global displayed_module
-    ignore = get_ignore_object([], [])
     if event == 'call':
         code = frame.f_code
         filename = frame.f_globals.get('__file__', None)
@@ -86,6 +85,7 @@ def global_trace(frame, event, arg):
             modulename = _modname(filename)
             relative_filepath = filename.replace(os.getcwd(), "").lstrip(os.path.sep)
             if modulename is not None and relative_filepath != displayed_module:
+                ignore = get_ignore_object([], [])
                 ignore_it = ignore.names(filename, modulename)
                 if ignore_it:
                     return
