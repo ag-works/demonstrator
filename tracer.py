@@ -42,9 +42,12 @@ def toggle_execution_mode():
     orig_print(MOVE_CURSOR_UP * lines, "Paused" if EXECUTION_PAUSED else "Running")
 
 
-keyboard.add_hotkey('ctrl+shift+plus', increment_execution_time, suppress=True)
-keyboard.add_hotkey('ctrl+shift+-', decrement_execution_time, suppress=True)
-keyboard.add_hotkey('space', toggle_execution_mode, suppress=True)
+try:
+    keyboard.add_hotkey('ctrl+shift+plus', increment_execution_time, suppress=True)
+    keyboard.add_hotkey('ctrl+shift+-', decrement_execution_time, suppress=True)
+    keyboard.add_hotkey('space', toggle_execution_mode, suppress=True)
+except OSError as e:
+    pass
 
 
 def get_ignore_object(ignore_module, ignore_dir):
