@@ -14,6 +14,5 @@ def move_one_line_up_in_ternimal():
     print(MOVE_CURSOR_UP + ERASE, end="")
 
 
-def get_terminal_size():
-    terminal_size = os.get_terminal_size()
-    return terminal_size.lines, terminal_size.columns
+def get_relative_path(filename):
+    return filename.replace(os.getcwd(), "").lstrip(os.path.sep)
