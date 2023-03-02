@@ -1,9 +1,16 @@
-import os
 import math
+import os
 
 from utils import clear_screen, get_relative_path
 from colors import Color
 from constants import *
+
+
+translation_white_space_map = {
+    9: None,    # horizontal tab (\t)
+    10: None,   # new line character (\n)
+    13: None,   # carriage return (\r)
+}
 
 
 def get_terminal_size():
@@ -22,6 +29,7 @@ def display_vars(global_vars, local_vars, char=">"):
     lineno += 1
     for key, value in tuple(local_vars.items())[:10]:
         message = f"{Color.FG.lightgreen}{char * 2}{Color.reset} " + f"{key}: {value}"[:maxlength - 3]
+        message = message.translate(translation_white_space_map)
         orig_print(f"\x1b[{lineno};{position}f{ message }", end="")
         lineno += 1
     else:
@@ -33,6 +41,7 @@ def display_vars(global_vars, local_vars, char=">"):
     lineno += 1
     for key, value in tuple(global_vars.items())[:10]:
         message = f"{Color.FG.lightgreen}{char * 2}{Color.reset} " + f"{key}: {value}"[:maxlength - 3]
+        message = message.translate(translation_white_space_map)
         orig_print(f"\x1b[{lineno};{position}f{ message }", end="")
         lineno += 1
     else:
