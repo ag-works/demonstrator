@@ -14,9 +14,10 @@ from constants import *
 
 TICK_TIME = 1.8
 EXECUTION_PAUSED = False
+PREVIOUS_LINE_NO = None
+PREVIOUS_FILENAME = None
 
-orig_print, output_stream = print, TemporaryFile(mode="w+")
-displayed_module = None
+orig_print, output_stream, displayed_module = print, TemporaryFile(mode="w+"), None
 
 def print_func(*args, **kargs): orig_print(*args, **kargs)
 def dummy_print(*args, **kwargs): orig_print(*args, file=output_stream, **kwargs)
@@ -39,12 +40,15 @@ def toggle_execution_mode():
     orig_print("\x1b[H", "Paused" if EXECUTION_PAUSED else "Running", sep="")
 
 
-try:
-    keyboard.add_hotkey('ctrl+shift+plus', increment_execution_time, suppress=True)
-    keyboard.add_hotkey('ctrl+shift+-', decrement_execution_time, suppress=True)
+if os.geteuid() == 0:
+    # Add Hot Keys for manipulating the code execution parameters. For instance, 
+    #   * To slow down and speed up the code execution
+    #   * To pause and resume the code execution
     keyboard.add_hotkey('space', toggle_execution_mode, suppress=True)
-except OSError as e:
-    pass
+    keyboard.add_hotkey('U', increment_execution_time, suppress=True)
+    keyboard.add_hotkey('cmd+u', increment_execution_time, suppress=True)
+    keyboard.add_hotkey('D', decrement_execution_time, suppress=True)
+    keyboard.add_hotkey('cmd+d', decrement_execution_time, suppress=True)
 
 
 def get_ignore_object(ignore_module, ignore_dir):
@@ -75,47 +79,57 @@ def global_trace(frame, event, arg):
         sleep(TICK_TIME)
 
     global displayed_module
-    if event == 'call':
-        code = frame.f_code
-        filename = frame.f_globals.get('__file__', None)
-        if filename:
-            if filename == __file__ :
-                return
+    if event != 'call':
+        return
 
-            modulename = _modname(filename)
-            relative_filepath = get_relative_path(filename)
-            if modulename is not None and relative_filepath != displayed_module:
-                ignore = get_ignore_object([], [])
-                ignore_it = ignore.names(filename, modulename)
-                if ignore_it:
-                    return
+    filename = frame.f_globals.get('__file__', None)
+    if not filename or filename == __file__ :
+        return
 
-                display_module_message(relative_filepath)
-                sleep(TICK_TIME)
-                displayed_module = relative_filepath
-                return localtrace_trace
-        else:
-            return None
+    modulename = _modname(filename)
+    relative_filepath = get_relative_path(filename)
+    if relative_filepath == displayed_module:
+        return localtrace_trace
+
+    if modulename is not None and relative_filepath != displayed_module:
+        ignore = get_ignore_object([], [])
+        ignore_it = ignore.names(filename, modulename)
+        if ignore_it:
+            return
+
+        display_module_message(relative_filepath)
+        displayed_module = relative_filepath
+        sleep(TICK_TIME)
+        return localtrace_trace
 
 
 def localtrace_trace(frame, event, arg):
     while EXECUTION_PAUSED is True:
         sleep(TICK_TIME)
 
-    if event == "line":
-        # record the file name and line number of every trace
-        filename = frame.f_code.co_filename
-        lineno = frame.f_lineno
-        lvars = frame.f_locals
-        gvars = frame.f_globals
+    if event != "line":
+        return
 
-        code_lines = linecache.getlines(filename)
-        if filename == __file__ or len(code_lines) == 0:
-            return localtrace_trace
+    global PREVIOUS_LINE_NO, PREVIOUS_FILENAME
+    if PREVIOUS_LINE_NO == frame.f_lineno and PREVIOUS_FILENAME == frame.f_code.co_filename:
+        return
+    PREVIOUS_LINE_NO = frame.f_lineno
+    PREVIOUS_FILENAME = frame.f_code.co_filename
 
-        display_vars(gvars, lvars)
-        display_code(filename, code_lines, lineno)
-        sleep(TICK_TIME)
+    # record the file name and line number of every trace
+    filename = frame.f_code.co_filename
+    lineno = frame.f_lineno
+    lvars = frame.f_locals
+    gvars = frame.f_globals
+
+    code_lines = linecache.getlines(filename)
+    if filename == __file__ or len(code_lines) == 0:
+        return localtrace_trace
+
+    display_code(filename, code_lines, lineno)
+    display_vars(gvars, lvars)
+    sys.stdout.flush()
+    sleep(TICK_TIME)
 
     return localtrace_trace
 
@@ -125,7 +139,7 @@ def main():
         arguments = sys.argv
         progname = sys.argv[1]
         sys.argv = [progname, *arguments[2:]]
-        sys.path[0] = os.path.dirname(progname)
+        sys.path.insert(0, os.path.dirname(progname))
 
         with open(progname, 'rb') as fp:
             code = compile(fp.read(), progname, 'exec')
